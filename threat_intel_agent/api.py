@@ -310,7 +310,7 @@ async def investigation_events(request: InvestigationRequest) -> AsyncIterator[d
     yield {
         "type": "trace",
         "id": "generation",
-        "label": "Google ADK + Gemini",
+        "label": "Agent Loop + LLM",
         "duration_ms": round((time.perf_counter() - runner_started) * 1000, 2),
         "summary": f"{llm_calls} model event(s)",
         "request": {"model": request.model, "case_id": request.case_id},

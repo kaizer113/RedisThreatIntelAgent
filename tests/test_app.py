@@ -123,10 +123,38 @@ def test_case_queue_and_ui_use_product_name() -> None:
     assert "sessionId=crypto.randomUUID()" not in index.text
     assert "sessionId=createSessionId()" in index.text
     assert "View request and response" in index.text
+    assert '>Context Retriever tools</button>' in index.text
+    assert '<dialog id="toolsDialog"' in index.text
+    assert "fetch('/api/context/tools')" in index.text
     assert '<link rel="icon" type="image/png" href="/icon.png">' in index.text
     assert '<div class="mark" role="img"' in index.text
     assert icon.status_code == 200
     assert icon.headers["content-type"] == "image/png"
+
+
+def test_context_tool_catalog_returns_live_definitions(monkeypatch) -> None:
+    async def tool_definitions(force: bool = False):
+        assert force is True
+        return [
+            {
+                "name": "find_synthetic_indicators",
+                "description": "Find governed synthetic indicator evidence.",
+            }
+        ]
+
+    monkeypatch.setattr("threat_intel_agent.api.services.context.list_tools", tool_definitions)
+    with TestClient(app) as client:
+        response = client.get("/api/context/tools")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "tools": [
+            {
+                "name": "find_synthetic_indicators",
+                "description": "Find governed synthetic indicator evidence.",
+            }
+        ]
+    }
 
 
 def test_trace_payload_is_bounded_and_redacts_credentials() -> None:
