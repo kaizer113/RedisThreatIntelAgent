@@ -1,5 +1,3 @@
-"""Create or update the existing shopping Context Surface using ctxctl."""
-
 from __future__ import annotations
 
 import argparse
@@ -9,15 +7,25 @@ import os
 import subprocess
 from pathlib import Path
 from typing import Any
+from urllib.parse import unquote, urlparse
 
 from context_surfaces import UnifiedClient
 from dotenv import dotenv_values
 
-from scripts.generate_dataset import records_for_experience
-from valuewholesale_agent.config import Settings, get_settings
+from threat_intel_agent.config import Settings, get_settings
+from threat_intel_agent.context_models import (
+    HistoricalCase,
+    Indicator,
+    Observation,
+    Relationship,
+    ReputationRecord,
+    SignatureRecord,
+    ThreatCase,
+)
+from threat_intel_agent.demo_data import DATASETS
 
 ROOT = Path(__file__).resolve().parents[1]
-MODELS_PATH = ROOT / "valuewholesale_agent" / "context_models.py"
+MODELS_PATH = ROOT / "threat_intel_agent" / "context_models.py"
 
 
 def upsert_env(path: Path, updates: dict[str, str]) -> None:
@@ -38,10 +46,18 @@ def upsert_env(path: Path, updates: dict[str, str]) -> None:
     path.write_text("\n".join(output) + "\n", encoding="utf-8")
 
 
-def ctxctl(*args: str, admin_key: str | None = None) -> Any:
-    command = ["uv", "run", "ctxctl", "--no-color", "-o", "json", *args]
-    if admin_key:
-        command.extend(["--admin-key", admin_key])
+def ctxctl(*args: str, admin_key: str) -> Any:
+    command = [
+        "uv",
+        "run",
+        "ctxctl",
+        "--no-color",
+        "-o",
+        "json",
+        *args,
+        "--admin-key",
+        admin_key,
+    ]
     result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
     if result.returncode:
         raise RuntimeError(result.stderr.strip() or "ctxctl command failed")
@@ -49,8 +65,6 @@ def ctxctl(*args: str, admin_key: str | None = None) -> Any:
 
 
 def redis_connection(redis_url: str) -> tuple[str, str, str, bool]:
-    from urllib.parse import unquote, urlparse
-
     parsed = urlparse(redis_url)
     if not parsed.hostname or not parsed.port:
         raise ValueError("REDIS_URL must include a hostname and port")
@@ -66,54 +80,24 @@ def ensure_surface(
     env: dict[str, str],
     settings: Settings,
     env_path: Path,
-    *,
-    force_agent_key: bool,
 ) -> tuple[str, str]:
     admin_key = env.get("CTX_ADMIN_KEY", "")
     if not admin_key:
-        raise SystemExit("CTX_ADMIN_KEY is required in .env")
-    redis_url = env.get("REDIS_URL", "")
-    if not redis_url:
-        raise SystemExit("REDIS_URL is required in .env")
-
-    surface_id = env.get("CTX_SURFACE_ID", "")
-    if surface_id:
-        try:
-            ctxctl("surface", "describe", surface_id, admin_key=admin_key)
-        except RuntimeError:
-            surface_id = ""
-
+        raise SystemExit("CTX_ADMIN_KEY is required")
+    address, username, password, tls = redis_connection(env.get("REDIS_URL", ""))
+    surface_id = ""
+    for surface in ctxctl("surface", "list", admin_key=admin_key) or []:
+        if surface.get("name") == settings.context_surface_name:
+            surface_id = str(surface["id"])
+            break
     if not surface_id:
-        for surface in ctxctl("surface", "list", admin_key=admin_key) or []:
-            if surface.get("name") == settings.effective_context_surface_name:
-                surface_id = str(surface["id"])
-                break
-
-    if surface_id:
-        ctxctl(
-            "surface",
-            "update",
-            surface_id,
-            "--name",
-            settings.effective_context_surface_name,
-            "--description",
-            f"Governed live ecommerce context for the "
-            f"{settings.experience.brand_name} ADK shopping agent.",
-            "--models",
-            str(MODELS_PATH),
-            admin_key=admin_key,
-        )
-        print(f"Updated Context Surface {surface_id}")
-    else:
-        address, username, password, tls_enabled = redis_connection(redis_url)
-        create_args = [
+        args = [
             "surface",
             "create",
             "--name",
-            settings.effective_context_surface_name,
+            settings.context_surface_name,
             "--description",
-            f"Governed live ecommerce context for the "
-            f"{settings.experience.brand_name} ADK shopping agent.",
+            "Governed synthetic evidence for Redis Threat Intelligence Agent",
             "--models",
             str(MODELS_PATH),
             "--redis-addr",
@@ -123,54 +107,51 @@ def ensure_surface(
             "--redis-password",
             password,
         ]
-        if tls_enabled:
-            create_args.append("--redis-tls")
-        payload = ctxctl(*create_args, admin_key=admin_key)
-        surface_id = str(payload["id"])
+        if tls:
+            args.append("--redis-tls")
+        surface_id = str(ctxctl(*args, admin_key=admin_key)["id"])
         print(f"Created Context Surface {surface_id}")
-
-    agent_key = "" if force_agent_key else env.get("MCP_AGENT_KEY", "")
-    if not agent_key:
-        payload = ctxctl(
-            "agent",
-            "create",
-            "--surface-id",
+    else:
+        ctxctl(
+            "surface",
+            "update",
             surface_id,
             "--name",
-            settings.effective_context_agent_name,
+            settings.context_surface_name,
             "--description",
-            settings.effective_context_agent_display_name,
+            "Governed synthetic evidence for Redis Threat Intelligence Agent",
+            "--models",
+            str(MODELS_PATH),
             admin_key=admin_key,
         )
-        agent_key = str(payload["key"])
-        print("Created a new Context Retriever agent key")
+        print(f"Updated Context Surface {surface_id}")
 
+    agent_payload = ctxctl(
+        "agent",
+        "create",
+        "--surface-id",
+        surface_id,
+        "--name",
+        settings.context_agent_name,
+        "--description",
+        "Read-only synthetic evidence analyst",
+        admin_key=admin_key,
+    )
+    agent_key = str(agent_payload["key"])
     upsert_env(env_path, {"CTX_SURFACE_ID": surface_id, "MCP_AGENT_KEY": agent_key})
+    print("Created a dedicated Context Retriever agent key")
     return surface_id, agent_key
 
 
-async def import_records(
-    surface_id: str,
-    admin_key: str,
-    settings: Settings,
-) -> None:
-    from valuewholesale_agent.context_models import (
-        Inventory,
-        Member,
-        Order,
-        OrderItem,
-        Product,
-        Warehouse,
-    )
-
-    datasets = records_for_experience(settings.experience_id)
+async def import_records(surface_id: str, admin_key: str) -> None:
     entities = {
-        Product: datasets["products"],
-        Warehouse: datasets["warehouses"],
-        Inventory: datasets["inventory"],
-        Member: datasets["members"],
-        Order: datasets["orders"],
-        OrderItem: datasets["order_items"],
+        ThreatCase: DATASETS["cases"],
+        Indicator: DATASETS["indicators"],
+        Observation: DATASETS["observations"],
+        ReputationRecord: DATASETS["reputation_records"],
+        SignatureRecord: DATASETS["signature_records"],
+        Relationship: DATASETS["relationships"],
+        HistoricalCase: DATASETS["historical_cases"],
     }
     async with UnifiedClient() as client:
         for model, rows in entities.items():
@@ -186,23 +167,17 @@ async def import_records(
 
 async def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--rotate-agent-key", action="store_true")
     parser.add_argument("--env-file", type=Path, default=Path(".env"))
     args = parser.parse_args()
     env_path = args.env_file.resolve()
-    raw_env = dotenv_values(env_path)
-    env = {key: str(value or "") for key, value in raw_env.items()}
+    env = {key: str(value or "") for key, value in dotenv_values(env_path).items()}
     os.environ.update(env)
     get_settings.cache_clear()
     settings = Settings(_env_file=env_path)
-    surface_id, agent_key = ensure_surface(
-        env,
-        settings,
-        env_path,
-        force_agent_key=args.rotate_agent_key,
-    )
-    await import_records(surface_id, env["CTX_ADMIN_KEY"], settings)
-    tools = await UnifiedClient().list_tools(agent_key)
+    surface_id, agent_key = ensure_surface(env, settings, env_path)
+    await import_records(surface_id, env["CTX_ADMIN_KEY"])
+    async with UnifiedClient() as client:
+        tools = await client.list_tools(agent_key)
     print(f"Context Retriever ready with {len(tools)} generated tools")
 
 

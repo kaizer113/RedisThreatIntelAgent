@@ -14,7 +14,3 @@ dist/
 build/
 *.egg-info/
 .adk/
-
-# Local Codex working context (never commit).
-/local_agent.md
-/AGENTS.md
