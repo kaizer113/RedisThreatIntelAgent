@@ -13,6 +13,7 @@ RUN uv sync --frozen --no-dev
 RUN uv run --no-sync python -c "from huggingface_hub import snapshot_download; snapshot_download('redis/langcache-embed-v3-small')"
 
 COPY threat_intel_agent ./threat_intel_agent
+COPY icon2.png ./icon2.png
 COPY scripts ./scripts
 
 EXPOSE 8082
