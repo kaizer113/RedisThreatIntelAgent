@@ -6,6 +6,13 @@ and returns a proposed assessment for human review.
 
 The demo never publishes or enforces an assessment. Every indicator and observation is synthetic.
 
+## Demo
+
+The interface shows the synthetic investigation queue, governed Context Retriever activity, live
+execution traces, and proposed assessments for analyst review.
+
+![Redis Threat Intelligence Agent analyzing synthetic related infrastructure](docs/images/redis-threat-intelligence-agent-demo.png)
+
 ## Capabilities
 
 - FastAPI newline-delimited JSON streaming and a live execution trace;
