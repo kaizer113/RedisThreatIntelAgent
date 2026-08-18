@@ -1,0 +1,82 @@
+%%{init: {"theme":"base","themeVariables":{"background":"#ffffff","primaryTextColor":"#111827","lineColor":"#334155","clusterBkg":"#f8fafc","clusterBorder":"#94a3b8"},"flowchart":{"curve":"basis"}}}%%
+flowchart TB
+    browser["Browser chat UI<br/>member + model selectors · answer · live trace"]
+
+    subgraph gcp["GCP · us-east4"]
+        direction TB
+        subgraph run["Public application · FastAPI"]
+            direction LR
+            api["Chat API"] --> route{"Semantic Router match?"}
+            route -->|cache eligible| gate{"LangCache hit?"}
+            gate -->|hit| cached["Cached response<br/>skip retrieval + ADK + Gemini"]
+            gate -->|miss| prefetch["Required Redis context<br/>+ parallel ADK timing"]
+            route -->|bypass| prefetch
+            prefetch --> runners["Shared ADK services<br/>Flash Runner · Pro Runner"]
+            runners --> tools["Commerce, context,<br/>cart and memory tools"]
+        end
+
+        subgraph vertex["Vertex AI / Agent Platform"]
+            direction LR
+            gemini["Gemini 3.1<br/>Flash-Lite or Pro"]
+            sessions["Agent Platform Sessions<br/>VertexAiSessionService"]
+            bank["ADK Memory Bank<br/>retrieve + post-turn promote"]
+        end
+    end
+
+    commerce[("Persistent commerce database<br/>orders · carts · transactions")]
+    warehouse[("Persistent warehouse database<br/>inventory · fulfillment")]
+    master[("Persistent master-data database<br/>products · pricing · members")]
+
+    subgraph rediscloud["Redis Cloud"]
+        direction TB
+        rdi["Redis Data Integration<br/>CDC capture + continuous sync"]
+        cache["LangCache<br/>policy + product education + shopping guides"]
+        ram["Agent Memory<br/>session events + long-term facts"]
+        context["Context Retriever<br/>governed live-data tools"]
+        semantic["Semantic Router<br/>routes scoped reusable questions to LangCache"]
+        database["Database + Query Engine<br/>catalog, policy, cart, commerce data"]
+    end
+
+    browser -->|HTTP + streamed NDJSON| api
+
+    route --> semantic
+    semantic --> database
+    route -->|eligible query| cache
+    cache -->|hit or miss| gate
+    prefetch -->|required recent events + recall| ram
+    prefetch -.->|timed only · excluded| bank
+    prefetch -.->|timed only · excluded| sessions
+    prefetch -->|first-turn member profile| context
+
+    runners --> gemini
+    runners -->|persist · history excluded| sessions
+    api -.->|background canonical events · transcript session ID| sessions
+    runners -->|post-turn promotion| bank
+    tools --> context
+    tools --> database
+    tools --> ram
+    context --> database
+    api -.->|background user + assistant events| ram
+
+    cache --> database
+    ram --> database
+    commerce -->|CDC change log| rdi
+    warehouse -->|CDC change log| rdi
+    master -->|CDC change log| rdi
+    rdi -->|apply inserts + updates| database
+
+    classDef client fill:#f2f7ff,stroke:#2864dc,color:#102a43
+    classDef app fill:#fff4e8,stroke:#d97706,color:#4a2500
+    classDef google fill:#eef6ff,stroke:#4285f4,color:#17365d
+    classDef redis fill:#fff0f0,stroke:#dc382d,color:#4a1512
+    classDef source fill:#f2fbf3,stroke:#2f855a,color:#153d29
+
+    class browser client
+    class api,prefetch,route,gate,cached,runners,tools app
+    class gemini,sessions,bank google
+    class rdi,cache,ram,context,semantic,database redis
+    class commerce,warehouse,master source
+
+    style rediscloud fill:#fffafa,stroke:#dc382d,stroke-width:2px
+
+    linkStyle default stroke:#334155,stroke-width:2px
