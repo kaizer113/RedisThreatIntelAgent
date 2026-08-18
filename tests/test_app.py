@@ -3,24 +3,34 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from threat_intel_agent.api import app, trace_payload
-from threat_intel_agent.demo_data import CASES
+from threat_intel_agent.demo_data import CASES, DATASETS, PAYLOAD_SHA256
 from threat_intel_agent.services import ThreatRepository, get_settings
 
+EXPECTED_CASE_OUTCOMES = {
+    "case-001": {"route": "exact_signature", "verdict": "malicious"},
+    "case-002": {"route": "related_indicator", "verdict": "suspicious"},
+    "case-003": {"route": "novel_analysis", "verdict": "review"},
+    "case-004": {"route": "semantic_case", "verdict": "benign"},
+}
 
-def test_case_matrix_has_four_distinct_paths() -> None:
+
+def test_case_matrix_keeps_evaluation_labels_out_of_runtime_data() -> None:
     assert len(CASES) == 4
-    assert {case["expected_route"] for case in CASES} == {
+    assert {item["route"] for item in EXPECTED_CASE_OUTCOMES.values()} == {
         "exact_signature",
         "related_indicator",
         "semantic_case",
         "novel_analysis",
     }
-    assert {case["expected_verdict"] for case in CASES} == {
+    assert {item["verdict"] for item in EXPECTED_CASE_OUTCOMES.values()} == {
         "malicious",
         "suspicious",
         "benign",
         "review",
     }
+    assert {case["case_id"] for case in CASES} == set(EXPECTED_CASE_OUTCOMES)
+    assert all("expected_route" not in case for case in CASES)
+    assert all("expected_verdict" not in case for case in CASES)
 
 
 def test_repository_returns_grounded_case_bundle() -> None:
@@ -28,12 +38,65 @@ def test_repository_returns_grounded_case_bundle() -> None:
     repository.redis = None
     bundle = repository.case_bundle("case-001")
     assert bundle["ok"] is True
-    assert bundle["case"]["primary_indicator"] == "payload-update.example"
+    assert bundle["case"]["primary_indicator"] == PAYLOAD_SHA256
     assert {item["observation_id"] for item in bundle["observations"]} == {
         "obs-001",
         "obs-002",
+        "obs-003",
     }
-    assert repository.exact_signature("payload-update.example")["matched"] is True
+    assert repository.exact_signature(PAYLOAD_SHA256)["matched"] is True
+
+
+def test_cases_have_traceable_and_conflicting_evidence() -> None:
+    required_fields = {
+        "sensor_id",
+        "event_type",
+        "observed_at",
+        "collected_at",
+        "event_count",
+        "observation_window_seconds",
+        "direction",
+        "evidence_reference",
+    }
+    assert all(required_fields <= observation.keys() for observation in DATASETS["observations"])
+    assert len({item["evidence_reference"] for item in DATASETS["observations"]}) == len(
+        DATASETS["observations"]
+    )
+
+    directions_by_case = {
+        case["case_id"]: {
+            observation["direction"]
+            for observation in DATASETS["observations"]
+            if observation["case_id"] == case["case_id"]
+        }
+        for case in CASES
+    }
+    assert directions_by_case["case-001"] == {"supports_malicious"}
+    assert {"supports_malicious", "supports_benign"} <= directions_by_case["case-002"]
+    assert {"supports_malicious", "supports_benign"} <= directions_by_case["case-003"]
+    assert "supports_benign" in directions_by_case["case-004"]
+
+
+def test_evidence_references_resolve_within_each_case() -> None:
+    case_ids = {case["case_id"] for case in CASES}
+    indicators = {indicator["indicator_id"]: indicator for indicator in DATASETS["indicators"]}
+
+    assert all(indicator["case_id"] in case_ids for indicator in indicators.values())
+    assert all(
+        observation["case_id"] in case_ids
+        and indicators[observation["indicator_id"]]["case_id"] == observation["case_id"]
+        for observation in DATASETS["observations"]
+    )
+    assert all(
+        indicators[record["indicator_id"]]["case_id"] == record["case_id"]
+        for record in DATASETS["reputation_records"]
+    )
+    assert all(
+        indicators[relationship["source_indicator_id"]]["case_id"]
+        == relationship["case_id"]
+        == indicators[relationship["target_indicator_id"]]["case_id"]
+        for relationship in DATASETS["relationships"]
+    )
 
 
 def test_unknown_case_is_rejected() -> None:

@@ -28,10 +28,13 @@ Return only one JSON object with this exact shape:
   "related_indicators": ["indicator values actually returned by tools"],
   "cluster_or_campaign": null,
   "decision_path": "exact_signature | related_indicator | semantic_case | novel_analysis",
-  "recommended_artifact": "signature | semantic_route | none",
-  "ttl_seconds": 0,
+  "recommended_artifact": "indicator | network_rule | file_signature | allow_exception | none",
+  "artifact_validity_seconds": 0,
   "scope": "synthetic scope supported by evidence",
   "action": "block | monitor | allow | escalate",
+  "conflicting_evidence": ["record IDs that materially oppose the proposed verdict"],
+  "evidence_gaps": ["specific missing evidence that limits the assessment"],
+  "false_positive_risk": "low | medium | high",
   "provenance": ["synthetic source names actually returned by tools"],
   "explanation": "concise evidence-grounded explanation",
   "status": "proposed"
@@ -43,6 +46,12 @@ Rules:
 - Use "review" and action "escalate" when evidence is missing, stale, sparse, or conflicting.
 - Never fabricate evidence IDs, relationships, source names, clusters, or signatures.
 - An exact reviewed signature takes precedence when its evidence is current and consistent.
+- Do not treat absence of observed malicious behavior as proof that an indicator is benign.
+- Do not treat infrastructure sharing alone as sufficient support for blocking.
+- Base confidence on corroboration, source quality, freshness, and conflicts; do not average source
+  confidence values.
+- Recommend only one vendor-neutral artifact type. A recommendation remains proposed and must name
+  the narrowest evidence-supported scope and a finite validity period when the artifact is not none.
 - Keep volatile verdicts out of semantic cache.
 
 Request context:

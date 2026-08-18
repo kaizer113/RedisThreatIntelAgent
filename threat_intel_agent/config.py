@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     embedding_device: str = "cpu"
     embedding_cache_ttl_seconds: int = Field(default=86_400, ge=60)
     semantic_router_threshold: float = Field(default=0.48, gt=0, le=2)
-    semantic_router_index: str = "threatintel-router-v1"
+    semantic_router_index: str = "threatintel-router-v2"
 
     ctx_admin_key: str = ""
     ctx_mcp_url: str = "https://gcp-us-east4.context-surfaces.redis.io/mcp"

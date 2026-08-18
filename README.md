@@ -34,15 +34,17 @@ endpoint and `VM_REDIS_URL` for the private VM endpoint.
 
 ## Synthetic investigations
 
-The first vertical slice contains four deterministic cases:
+The first vertical slice contains four evidence-grounded cases:
 
-1. exact reviewed signature;
-2. infrastructure related to a prior synthetic cluster;
-3. conflicting and incomplete evidence requiring review;
-4. a benign service with a beacon-like false-positive pattern.
+1. an exact reviewed file-hash recurrence corroborated by web, sandbox, and endpoint telemetry;
+2. infrastructure related by certificate reuse and passive DNS, without a captured payload;
+3. a concerning endpoint event contradicted by clean sandbox and sparse DNS evidence;
+4. a beacon-like service verified through ownership, certificate, cadence, and workflow evidence.
 
 The proposed result contains a verdict, confidence, evidence references, related indicators,
-decision path, artifact type, TTL, scope, action, provenance, explanation, and `status=proposed`.
+decision path, artifact type and validity, scope, action, conflicts, gaps, false-positive risk,
+provenance, explanation, and `status=proposed`. Evaluation labels are test-only and are never
+included in runtime evidence or routing inputs.
 
 ## Validation
 

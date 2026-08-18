@@ -12,15 +12,25 @@ Completed on 2026-08-17:
 - Google ADK orchestration without persistent ADK session or long-term memory services;
 - four synthetic cases covering exact, related, semantic-history, and novel-analysis paths;
 - structured proposed assessment contract and human-review boundary;
-- Redis database seeding with 28 synthetic records;
+- Redis database seeding with 38 synthetic records;
 - RedisVL decision routing and embedding-cache plumbing;
 - Redis Agent Memory session and durable-memory plumbing;
 - LangCache health/plumbing with verdict caching prohibited;
-- a new Context Retriever surface with 28 imported entities and 30 generated governed tools;
+- a new Context Retriever surface with 38 imported entities and 34 generated governed tools;
 - concurrent governed retrieval of observations, reputation, signatures, relationships, and
   reviewed history;
 - expandable, redacted request/response drill-downs for routing, retrieval, memory, and agent tools;
 - six passing tests and successful live case analysis.
+
+Improved on 2026-08-18:
+
+- removed evaluation verdicts and routes from runtime evidence and routing inputs;
+- enriched observations with sensor, collection time, event count, observation window, evidence
+  direction, and traceable source references;
+- added concrete certificate, DNS, file-hash, ownership, freshness, validity, and false-positive
+  evidence;
+- separated vendor-neutral proposed artifact types from internal semantic-routing decisions;
+- expanded current-behavior validation to eight passing tests and 38 model-valid records.
 
 ## Current data contract
 
@@ -36,7 +46,8 @@ Synthetic entities:
 
 Every result is `status=proposed` and contains a bounded verdict vocabulary, confidence, evidence
 references, related indicators, optional synthetic cluster, decision path, proposed artifact type,
-TTL, scope, recommended action, provenance, and explanation.
+artifact validity, scope, recommended action, conflicting evidence, evidence gaps, false-positive
+risk, provenance, and explanation.
 
 ## Remaining checkpoints
 

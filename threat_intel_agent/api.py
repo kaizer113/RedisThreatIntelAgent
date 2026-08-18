@@ -130,7 +130,6 @@ async def investigation_events(request: InvestigationRequest) -> AsyncIterator[d
     route = await asyncio.to_thread(
         services.router.route,
         f"{case['title']} {case['summary']}",
-        case["expected_route"],
     )
     yield {
         "type": "trace",
@@ -141,7 +140,6 @@ async def investigation_events(request: InvestigationRequest) -> AsyncIterator[d
         "request": trace_payload(
             {
                 "text": f"{case['title']} {case['summary']}",
-                "expected_evidence_path": case["expected_route"],
             }
         ),
         "response": trace_payload(route),

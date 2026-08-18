@@ -62,6 +62,7 @@ class ThreatRepository:
             id_field = id_fields[dataset_name]
             for row in rows:
                 key = f"{self.settings.redis_key_prefix}:{entity}:{row[id_field]}"
+                pipeline.delete(key)
                 pipeline.hset(
                     key,
                     mapping={
@@ -154,18 +155,22 @@ class SemanticRouterService:
         "exact_signature": [
             "exact signature match for a known indicator",
             "known payload hash or domain",
+            "previously reviewed payload hash reappeared with consistent behavior",
         ],
         "related_indicator": [
             "indicator connected to known infrastructure",
             "shared certificate hosting or campaign relationship",
+            "new infrastructure shares certificate and DNS relationships with a reviewed cluster",
         ],
         "semantic_case": [
             "similar to a previously reviewed investigation",
             "historical analyst case notes match this behavior",
+            "behavior matches a registered approved service and reviewed false positive",
         ],
         "novel_analysis": [
             "new conflicting or incomplete evidence requires review",
             "unknown indicator with sparse observations",
+            "one concerning event conflicts with clean sandbox and sparse telemetry",
         ],
     }
 
@@ -205,14 +210,7 @@ class SemanticRouterService:
                 )
         return self._router
 
-    def route(self, text: str, deterministic_route: str = "") -> dict[str, Any]:
-        if deterministic_route in self.ROUTES:
-            return {
-                "route": deterministic_route,
-                "source": "evidence-priority",
-                "distance": None,
-                "duration_ms": 0,
-            }
+    def route(self, text: str) -> dict[str, Any]:
         if not self.configured:
             return {
                 "route": "novel_analysis",
