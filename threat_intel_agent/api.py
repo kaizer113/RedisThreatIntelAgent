@@ -374,7 +374,29 @@ async def health() -> dict[str, Any]:
 
 @app.get("/api/context/tools")
 async def context_tools() -> dict[str, Any]:
-    return {"tools": await services.context.list_tools(force=True)}
+    tools = await services.context.list_tools(force=True)
+    entities = [
+        ("threatcase", "Threat Case"),
+        ("indicator", "Indicator"),
+        ("observation", "Observation"),
+        ("reputationrecord", "Reputation Record"),
+        ("signaturerecord", "Signature Record"),
+        ("relationship", "Relationship"),
+        ("historicalcase", "Historical Case"),
+    ]
+    grouped = {key: [] for key, _ in entities}
+    grouped["other"] = []
+    for tool in tools:
+        name = str(tool.get("name") or "").lower()
+        key = next((key for key, _ in entities if f"_{key}" in name), "other")
+        grouped[key].append(tool)
+    return {
+        "entities": [
+            {"name": label, "tools": sorted(grouped[key], key=lambda tool: tool.get("name", ""))}
+            for key, label in [*entities, ("other", "Other")]
+            if grouped[key]
+        ]
+    }
 
 
 @app.post("/api/investigate/stream")

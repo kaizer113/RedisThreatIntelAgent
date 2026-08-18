@@ -126,6 +126,8 @@ def test_case_queue_and_ui_use_product_name() -> None:
     assert '>Context Retriever tools</button>' in index.text
     assert '<dialog id="toolsDialog"' in index.text
     assert "fetch('/api/context/tools')" in index.text
+    assert "payload.entities" in index.text
+    assert "tool-group" in index.text
     assert '<link rel="icon" type="image/png" href="/icon.png">' in index.text
     assert '<div class="mark" role="img"' in index.text
     assert icon.status_code == 200
@@ -137,9 +139,10 @@ def test_context_tool_catalog_returns_live_definitions(monkeypatch) -> None:
         assert force is True
         return [
             {
-                "name": "find_synthetic_indicators",
-                "description": "Find governed synthetic indicator evidence.",
-            }
+                "name": "get_indicator_by_id",
+                "description": "Get Indicator by ID.",
+            },
+            {"name": "count_threatcase", "description": "Count ThreatCase records."},
         ]
 
     monkeypatch.setattr("threat_intel_agent.api.services.context.list_tools", tool_definitions)
@@ -148,10 +151,24 @@ def test_context_tool_catalog_returns_live_definitions(monkeypatch) -> None:
 
     assert response.status_code == 200
     assert response.json() == {
-        "tools": [
+        "entities": [
             {
-                "name": "find_synthetic_indicators",
-                "description": "Find governed synthetic indicator evidence.",
+                "name": "Threat Case",
+                "tools": [
+                    {
+                        "name": "count_threatcase",
+                        "description": "Count ThreatCase records.",
+                    }
+                ],
+            },
+            {
+                "name": "Indicator",
+                "tools": [
+                    {
+                        "name": "get_indicator_by_id",
+                        "description": "Get Indicator by ID.",
+                    }
+                ],
             }
         ]
     }
