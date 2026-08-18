@@ -92,3 +92,10 @@ request.
 No external vendor API, production verdict taxonomy, feed, approval system, publishing mechanism,
 or enforcement interface is assumed. Adding one requires verified primary documentation and an
 explicit design decision.
+
+## Future workflow proposal
+
+[BACKGROUND_ANALYSIS_SPEC.md](BACKGROUND_ANALYSIS_SPEC.md) defines a proposed submission-triggered
+background workflow, immutable decision checkpoints, an analyst review queue, and optional
+checkpoint-grounded conversation. It is not part of the current implementation or active migration
+checkpoints.
